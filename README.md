@@ -262,3 +262,292 @@ plt.show()
 Considering bright and temperature, red dwarfs and brown dwarfs are close, while supergiants and hypergiants have this property too. White dwarfs and the Main Sequence are very highlighted as a defined group with this variables.
 
 ## Groupby queries and data cleansing
+Now this is the moment to study the remaining columns, the string data. For this, ```.groupby()``` was used:
+
+```df.groupby(['Color','Type']).agg(count_color = ('Color','count'))```
+
+![image](https://github.com/user-attachments/assets/88324eeb-da9a-423e-837b-6ddcee1277cf)
+
+What a mess! This column needs a data cleansing. We can do it with:
+
+```
+df['Color'] = df['Color'].str.capitalize()
+df['Color'] = df['Color'].str.replace(' ','-')
+df['Color'] = df['Color'].str.replace('White-yellow','Yellow-white')
+df['Color'] = df['Color'].str.replace('Whitish','White')
+df['Color'] = df['Color'].str.replace('Yellowish','Yellow')
+df.to_csv('star_class.csv')
+df['Color'].unique()
+```
+
+![image](https://github.com/user-attachments/assets/f7d5ea08-7742-441c-a81d-e7122d53fbf5)
+
+Now we can have a better query with ```df.groupby(['Color','Type']).agg(count_color = ('Color','count'))```:
+
+![image](https://github.com/user-attachments/assets/6560ab87-6937-4bb7-8a16-812022713f5c)
+
+Red and brown dwarfs restrict to red color, while white dwarfs can be not only white, but not being red or orange. Bigger types have more dispersion in color. When we consider Planck's Law and [Black Body Spectrum](https://phet.colorado.edu/sims/html/blackbody-spectrum/latest/blackbody-spectrum_all.html), this makes sense. Studying the spectral class (O, B, A, F, G, K, M) with ```df.groupby(['Color','Spectral_Class']).agg(count_color = ('Color','count'))```, we have:
+
+![image](https://github.com/user-attachments/assets/d85607b1-0f68-483b-bf4e-f06f558cd3f7)
+
+Our data doesn't disagree with spectral classification. Classes closer to O stars goes to white and blue, while the closer to M goes to red. This is more evidenced with:
+
+```
+df_groupby = df.groupby(['Spectral_Class', 'Type'])\
+    .agg(count_spec=('Spectral_Class', 'count'), temp_mean=('Temperature', 'mean'))
+
+df_groupby = df_groupby.sort_values(by=['Spectral_Class','temp_mean'],ascending = False)
+df_groupby
+```
+
+![image](https://github.com/user-attachments/assets/1e54d0a0-809f-438a-a397-e3cf6fbf8aeb)
+
+# Data Science
+
+## Multiple Linear Regression model
+
+### Why Linear Regression?
+Linear Regression is a statistical technique to predict a continuous numeric variable, like a house price, based in previous data. This characteristic shows it's not recommended to classify categorical data. Linear Regression rarely (to almost never) provides a integer number as result. A simple linear regression is calculated by:
+
+$$
+y = \beta_0 + \beta_1 X
+$$
+
+Where:
+- y is the dependent variable,
+- X is the independent variable,
+- $$\beta_0$$ is the intercept (the value of \(y\) when \(x = 0\)),
+- $$\beta_1$$ is the slope (the change in \(y\) for a unit change in \(x\)),
+
+The intercept $$\beta_0$$ and the slope $$\beta_1$$ are calculated as:
+
+$$
+\beta_1 = \frac{\sum{(X_i - \bar{X})(y_i - \bar{y})}}{\sum{(X_i - \bar{X})^2}}
+$$
+
+$$
+\beta_0 = \bar{y} - \beta_1 \bar{X}
+$$
+
+Where:
+- $$\bar{X}$$ is the mean of the independent variable X;
+- $$\bar{y}$$ is the mean of the dependent variable y;
+- $$\(X_i)$$ and $$\(y_i)$$ are individual observations of X and y, respectively.
+
+Multiple regression is calculated by:
+
+$$
+y = \beta_0 + \beta_1 \(X_1) + ... + \beta_n \(X_n)
+$$
+
+$$\(X_n)$$ is the n-th variable in the research. 
+
+Although it is possible for linear regression to return an integer number, it's really rare because of the equation properties and practically impossible with Physics data, so it's not recommended to classification. **But the correlation study revealed ```Type``` is an ordinal categorical data and its relation with absolute magnitude is almost a first-degree equation. Having previous Astrophysics knowledge, it's normal to deduce a multiple correlation between training columns set and the target column.** The use of Linear Regression turns to have scientific purposes to test this model capacities.
+
+### The code
+The metrics used to validate the model were $$\{R}^2$$ and MSE (Mean Squared Error). MSE is calculated by:
+
+$$
+\text{MSE} = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+$$
+
+Where:
+- n is the number of observations;
+- $$\(y_i)$$ is the actual value of the $$\(i^{th})\$$ observation;
+- $$\(\hat{y}_i\)$$ is the predicted value of the $$\(i^{th})\$$ observation.
+
+The $$\{R}^2$$ in a number n of observations is calculated by:
+
+$$
+\{R}^2 = 1 - \frac{\sum{(y_i - \hat{y}_i)^2}}{\sum{(y_i - \bar{y})}^2}
+$$
+
+Where:
+- $$\(y_i\)$$ is the actual value of the $$\(i^{th}\)$$ observation;
+- $$\(\hat{y}_i\)$$ is the predicted value of the $$\(i^{th}\)$$ observation;
+- $$\(\bar{y}\)$$ is the mean of the actual values.
+
+$$\{R}^2$$ is between 0 and 1. The closer $$\{R}^2$$ is from 1, it means the model has better predict power, else, it has lower predict power.
+
+Firstly, the regression was tested rounding the predicted value and considering only MSE:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = df['Type']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+reg = LinearRegression().fit(X_train, y_train)
+prediction = reg.predict(X_test)
+
+dictiona = {'prev':prediction,'real':y_test}
+dictiona = pd.DataFrame(dictiona)
+dictiona['prev'] = round(dictiona['prev'])
+dictiona['error'] = dictiona['prev'] - dictiona['real']
+dictiona['sq_error'] = (dictiona['prev'] - dictiona['real'])**2
+
+dictiona.sq_error.describe()
+```
+
+This is the output:
+
+![image](https://github.com/user-attachments/assets/02b22f0c-9d3e-4ee1-a77a-1b6e63188a6f)
+
+Surprisingly, the MSE is only $$\frac{1}{3}$$, but there's a relatively high standard-deviation. Because of linear regression nature, when we don't round the prediction and use $$\{R}^2$$, we have better results:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = df['Type']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+reg = LinearRegression().fit(X_train, y_train)
+prediction = reg.predict(X_test)
+
+print(f'R^2: {round((r2_score(y_test,prediction)*100),2)}%\n')
+
+dictiona_1 = {'prev':prediction,'real':y_test}
+dictiona_1 = pd.DataFrame(dictiona_1)
+dictiona_1['error'] = dictiona_1['prev'] - dictiona_1['real']
+dictiona_1['sq_error'] = (dictiona_1['prev'] - dictiona_1['real'])**2
+
+dictiona_1.sq_error.describe()
+```
+
+![image](https://github.com/user-attachments/assets/900f5e49-c49a-4c00-b7da-e552898a65c2)
+
+Not only MSE is lower than the previous example, but the errors have lower standard-deviation and $$\{R}^2$$ is close to 1! That means that, although linear regression is not recommended to classification, when we consider star classes as an ordinal variable, the model works very well! We can also create a function that gives the probability of the prediction being from the classes between it. Let's consider the probability of being from a class $$c_i$$ as:
+
+$$ P(c_i) = 1 - |{\hat{y} - c_i}| $$
+
+Where $$\hat{y}$$ is the predicted value.
+
+The code for this is:
+
+```
+def class_prob(array,df_pred,regr):
+  if len(array) != len(df_pred.columns):
+    raise Exception("Given data doesn't match with dataframe columns")
+  else:
+    cols = df_pred.columns
+    i = 0
+    dicti = {}
+    while i < len(array):
+      dicti[cols[i]] = [array[i]]
+      i += 1
+    dat = pd.DataFrame(dicti)
+    predic = regr.predict(dat)
+    a = int(predic[0])
+    b = a + 1
+    dict_prev = {}
+    dict_prev['Type'] = [a,b]
+    dict_prev['Prob'] = [(1 - abs(predic - a))[0],(1 - abs(predic - b))[0]]
+    prev = pd.DataFrame(dict_prev)
+    return prev
+```
+
+This function considers that a predicted value will be between a class *a* (as the rounding of prediction) and a class *b* (*a* + 1). An example of usage is:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = [5000,16,4,-11]
+
+class_prob(y,X,reg)
+```
+
+![image](https://github.com/user-attachments/assets/cf0d19b5-4988-4e63-8acd-2f063dbbc26b)
+
+
+## Neural Network
+Now we can make a comparison with a Neural Network. Using a Perceptron as example, the accuracy turns really bad:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = df['Type']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+perc = Perceptron(random_state=42)
+perc.fit(X_train,y_train)
+y_prev = perc.predict(X_test)
+
+print(f'Accuracy score in Perceptron model is {round(accuracy_score(y_test,y_prev)*100,2)}%')
+
+>>> Accuracy score in Perceptron model is 31.67%
+```
+
+That's why Keras is in the project:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = df['Type']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+newt = keras.Sequential([
+    keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+    keras.layers.Dense(32, activation='relu'),
+    keras.layers.Dense(16, activation='relu'),
+    keras.layers.Dense(6, activation='softmax')
+])
+
+newt.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+newt.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.2)
+
+y_pred = newt.predict(X_test)
+y_pred = y_pred.argmax(axis=1)
+
+print(f'Accuracy: {round(accuracy_score(y_test, y_pred)*100,2)}%')
+```
+
+The accuracy is ```98.33%```, a suspicious value. For true validation, we can use cross-validation. For this, scikit-learn is used:
+
+```
+X = df.drop(columns=['Type','Spectral_Class','Color'],axis=1)
+y = df['Type']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+mlp = MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=500, random_state=42)
+mlp.fit(X_train, y_train)
+
+y_pred = mlp.predict(X_test)
+
+print(f'Accuracy: {round(accuracy_score(y_test, y_pred)*100,2)}%\n')
+print(classification_report(y_test, y_pred))
+
+cv_scores = cross_val_score(mlp, X, y, cv=5)
+
+print(f'Mean accuracy in cross-validation: {round(cv_scores.mean() * 100,2)}%')
+print(f'Accuracy standard-deviation in cross-validation: {round(cv_scores.std() * 100,2)}%')
+```
+
+![image](https://github.com/user-attachments/assets/bf16062d-cc49-4785-a916-619c65c32c93)
+
+Although accuracy was high, the cross-validation reveals a low average accuracy and a low standard-deviation. This means the model suffered **overfitting**, i.e., it learned a lot in training data, but it's too much and it's not good for real classifications!
+
+# Conclusion
+The linear regression was better in classification, for this particular example, than the neural network. For this Physics problem, the stars classes follows a hierarchy and can be predicted with good results and high $$\{R}^2$$. This demonstrated how science can advance with simple and curious questions that seems to be weird and how researches in general can create valuable knowledge!
+
+<div align= center>
+
+# Contact
+
+
+
+[![logo](https://cdn-icons-png.flaticon.com/256/174/174857.png)](https://br.linkedin.com/in/giovanyrezende)
+[![logo](https://images.crunchbase.com/image/upload/c_lpad,f_auto,q_auto:eco,dpr_1/v1426048404/y4lxnqcngh5dvoaz06as.png)](https://github.com/GiovanyRezende)[
+![logo](https://logospng.org/download/gmail/logo-gmail-256.png)](mailto:giovanyrmedeiros@gmail.com)
+
+</div>

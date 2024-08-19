@@ -261,14 +261,14 @@ plt.show()
 
 Considering bright and temperature, red dwarfs and brown dwarfs are close, while supergiants and hypergiants have this property too. White dwarfs and the Main Sequence are very highlighted as a defined group with this variables.
 
-## Groupby queries and data cleansing
+## Groupby queries and data cleaning
 Now this is the moment to study the remaining columns, the string data. For this, ```.groupby()``` was used:
 
 ```df.groupby(['Color','Type']).agg(count_color = ('Color','count'))```
 
 ![image](https://github.com/user-attachments/assets/88324eeb-da9a-423e-837b-6ddcee1277cf)
 
-What a mess! This column needs a data cleansing. We can do it with:
+What a mess! This column needs a data cleaning. We can do it with:
 
 ```
 df['Color'] = df['Color'].str.capitalize()
